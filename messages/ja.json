@@ -1,0 +1,12 @@
+{
+  "HomePage": {
+    "title": "こんにちは、世界!",
+    "about": "このページは誰でもアクセスできるページです。"
+  },
+  "LocaleSwitcher": {
+    "Change Language": "言語を変更",
+    "English": "英語",
+    "Korean": "韓国語",
+    "Japanese": "日本語"
+  }
+}

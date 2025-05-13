@@ -1,0 +1,35 @@
+/* 로컬 스타일 - CSS 모듈로 사용 */
+.translateContainer {
+  position: relative;
+}
+
+.translateWidget {
+  font-size: 0;
+  position: absolute;
+  bottom: calc(530px + 16px);
+  right: 12px !important;
+  z-index: 99999;
+}
+
+.translateWidget select {
+  color: #383ffa;
+  border: none;
+  border-radius: 3px;
+  padding: 6px 8px;
+}
+
+.translateCombo {
+  width: 100%;
+  max-width: 200px;
+  padding: 8px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #333;
+}
+
+/* 특별히 표시하고 싶은 경우에만 사용 */
+.displayNone {
+  display: none;
+}

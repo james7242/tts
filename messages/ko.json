@@ -1,0 +1,12 @@
+{
+  "HomePage": {
+    "title": "안녕 세상아!",
+    "about": "이 페이지는 누구나 접근할 수 있는"
+  },
+  "LocaleSwitcher": {
+    "Change Language": "언어 변경",
+    "English": "영어",
+    "Korean": "한국어",
+    "Japanese": "일본어"
+  }
+}
