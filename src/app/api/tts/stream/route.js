@@ -4,10 +4,19 @@ import path from 'path';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
-import { getLanguageCodeFromVoice, isFFmpegInstalled } from '@/lib/tts/languages'; // 공통 모듈 임포트
+import { getLanguageCodeFromVoice } from '@/lib/tts/languages'; // 공통 모듈 임포트
 const gTTS = require('gtts');
 
-
+// FFmpeg 설치 여부 확인 (서버 측에서만 사용)
+function isFFmpegInstalled() {
+  try {
+    execSync('ffmpeg -version', { stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    console.log('FFmpeg가 설치되어 있지 않습니다. 속도와 피치 조절이 제한됩니다.');
+    return false;
+  }
+}
 
 export async function POST(request) {
   try {

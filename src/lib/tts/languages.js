@@ -73,18 +73,3 @@ export function getLanguageMap() {
 }
 
 
-// FFmpeg 설치 여부 확인 (서버 측에서만 사용)
-export function isFFmpegInstalled() {
-  if (typeof window !== 'undefined') {
-    return false; // 클라이언트 측에서는 항상 false 반환
-  }
-
-  try {
-    const { execSync } = require('child_process');
-    execSync('ffmpeg -version', { stdio: 'ignore' });
-    return true;
-  } catch (error) {
-    console.log('FFmpeg가 설치되어 있지 않습니다. 속도와 피치 조절이 제한됩니다.');
-    return false;
-  }
-}
