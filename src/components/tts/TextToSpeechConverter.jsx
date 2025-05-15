@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Script from 'next/script';
+import { getUILanguagesList } from '@/lib/tts/languages'; // 공통 모듈 임포트
 
 export default function TextToSpeechConverter() {
   // 기존 상태들
@@ -28,25 +29,11 @@ export default function TextToSpeechConverter() {
   const audioRef = useRef(null);
   const previewAudioRef = useRef(null);
 
-  // 지원되는 언어 목록
-  const supportedLanguages = [
-    { code: 'auto', name: '자동 감지 (음성에서)' },
-    { code: 'ko', name: '한국어' },
-    { code: 'en', name: '영어' },
-    { code: 'ja', name: '일본어' },
-    { code: 'zh', name: '중국어' },
-    { code: 'ru', name: '러시아어' }
-    // { code: 'es', name: '스페인어' },
-    // { code: 'fr', name: '프랑스어' },
-    // { code: 'de', name: '독일어' },
-    // { code: 'it', name: '이탈리아어' },
-    // { code: 'pt', name: '포르투갈어' },
-    // { code: 'ar', name: '아랍어' },
-    // { code: 'hi', name: '힌디어' },
-    // { code: 'th', name: '태국어' },
-    // { code: 'vi', name: '베트남어' },
-    // { code: 'id', name: '인도네시아어' }
-  ];
+  const supportedLanguages = getUILanguagesList();
+
+  // FFmpeg 설치 여부 상태 추가
+  const [isFFmpegInstalled, setIsFFmpegInstalled] = useState(null); // 초기값은 null (로딩 중)
+  const [isFFmpegChecking, setIsFFmpegChecking] = useState(true);
 
   // Speech Synthesis 초기화
   useEffect(() => {
@@ -147,6 +134,48 @@ export default function TextToSpeechConverter() {
       audioRef.current.loop = isRepeat;
     }
   }, [isRepeat]);
+
+  // FFmpeg 설치 상태 확인
+  useEffect(() => {
+    const checkFFmpegStatus = async () => {
+      try {
+        setIsFFmpegChecking(true);
+        // FFmpeg 상태 확인 API 호출
+        const response = await fetch('/api/ffmpeg-status');
+        const data = await response.json();
+        setIsFFmpegInstalled(data.isInstalled);
+
+        // Vercel 환경에서는 기본적으로 FFmpeg가 없으므로 확인 불필요
+        if (data.environment === 'Vercel') {
+          setIsFFmpegInstalled(false);
+        }
+      } catch (error) {
+        console.error('FFmpeg 상태 확인 중 오류:', error);
+        setIsFFmpegInstalled(false); // 오류 시 기본적으로 false로 설정
+      } finally {
+        setIsFFmpegChecking(false);
+      }
+    };
+
+    checkFFmpegStatus();
+  }, []);
+
+  // 피치 및 속도 지원 여부에 따른 값 조정
+  useEffect(() => {
+    // FFmpeg가 없으면 피치와 속도를 기본값(1.0)으로 설정
+    if (isFFmpegInstalled === false) {
+      setRate(1.0);
+      setPitch(1.0);
+    }
+  }, [isFFmpegInstalled]);
+
+  // TTS API 호출 시 응답 헤더에서 FFmpeg 상태 업데이트
+  const updateFFmpegStatusFromResponse = (headers) => {
+    const ffmpegStatus = headers.get('X-FFmpeg-Installed');
+    if (ffmpegStatus !== null) {
+      setIsFFmpegInstalled(ffmpegStatus === 'true');
+    }
+  };
 
   // 텍스트 변경 핸들러
   const handleTextChange = (e) => {
@@ -271,8 +300,8 @@ export default function TextToSpeechConverter() {
       const requestData = {
         text,
         voice: selectedVoice,
-        rate,
-        pitch,
+        rate: isFFmpegInstalled ? rate : 1.0,  // FFmpeg 미설치 시 기본값 사용
+        pitch: isFFmpegInstalled ? pitch : 1.0, // FFmpeg 미설치 시 기본값 사용
         fileName // 파일 이름 추가
       };
 
@@ -289,6 +318,9 @@ export default function TextToSpeechConverter() {
         },
         body: JSON.stringify(requestData),
       });
+
+      // FFmpeg 상태 업데이트
+      updateFFmpegStatusFromResponse(response.headers);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -498,8 +530,8 @@ export default function TextToSpeechConverter() {
       const requestData = {
         text,
         voice: selectedVoice,
-        rate,
-        pitch,
+        rate: isFFmpegInstalled ? rate : 1.0,  // FFmpeg 미설치 시 기본값 사용
+        pitch: isFFmpegInstalled ? pitch : 1.0, // FFmpeg 미설치 시 기본값 사용
         fileName // 파일 이름 추가
       };
 
@@ -515,6 +547,9 @@ export default function TextToSpeechConverter() {
         },
         body: JSON.stringify(requestData),
       });
+
+      // FFmpeg 상태 업데이트
+      updateFFmpegStatusFromResponse(response.headers);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -576,6 +611,13 @@ export default function TextToSpeechConverter() {
       {loadError && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
           <p>{loadError}</p>
+        </div>
+      )}
+
+      {/* FFmpeg 설치 상태 알림 (설치되지 않은 경우) */}
+      {isFFmpegInstalled === false && (
+        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
+          <p>서버에 FFmpeg가 설치되어 있지 않아 속도와 피치 조절 기능이 제한됩니다.</p>
         </div>
       )}
 
@@ -657,44 +699,47 @@ export default function TextToSpeechConverter() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500">
-              * 서버 모드에서는 20개 이상의 언어가 지원됩니다. 자동 감지는 음성 이름에서 언어를 추출합니다.
+              * 서버 모드에서는 {supportedLanguages.length - 1}개 이상의 언어가 지원됩니다. 자동 감지는 음성 이름에서 언어를 추출합니다.
             </p>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <label htmlFor="rate" className="block text-sm font-medium text-gray-700 mb-2">
-              속도: {rate.toFixed(1)}
-            </label>
-            <input
-              id="rate"
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={rate}
-              onChange={handleRateChange}
-              className="w-full"
-            />
-          </div>
+        {/* 피치 및 속도 조절 UI - FFmpeg 설치된 경우에만 표시 */}
+        {isFFmpegInstalled !== false && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label htmlFor="rate" className="block text-sm font-medium text-gray-700 mb-2">
+                속도: {rate.toFixed(1)}
+              </label>
+              <input
+                id="rate"
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={rate}
+                onChange={handleRateChange}
+                className="w-full"
+              />
+            </div>
 
-          <div>
-            <label htmlFor="pitch" className="block text-sm font-medium text-gray-700 mb-2">
-              피치: {pitch.toFixed(1)}
-            </label>
-            <input
-              id="pitch"
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={pitch}
-              onChange={handlePitchChange}
-              className="w-full"
-            />
+            <div>
+              <label htmlFor="pitch" className="block text-sm font-medium text-gray-700 mb-2">
+                피치: {pitch.toFixed(1)}
+              </label>
+              <input
+                id="pitch"
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={pitch}
+                onChange={handlePitchChange}
+                className="w-full"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="mb-4">
           <label htmlFor="fileName" className="block text-sm font-medium text-gray-700 mb-2">
@@ -769,7 +814,7 @@ export default function TextToSpeechConverter() {
               <source src={audioUrl} type={serverMode ? "audio/mpeg" : "audio/wav"} />
               브라우저가 오디오 재생을 지원하지 않습니다.
             </audio>
-            <a
+          <a
             href={audioUrl}
             download={serverMode ? `${fileName}.mp3` : `${fileName}.wav`}
             className="inline-block px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"

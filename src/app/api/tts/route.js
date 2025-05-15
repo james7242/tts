@@ -4,69 +4,20 @@ import path from 'path';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
+import { getLanguageCodeFromVoice, isFFmpegInstalled } from '@/lib/tts/languages'; // 공통 모듈 임포트
 const gTTS = require('gtts');
 
-// 브라우저 음성 이름에서 gtts 언어 코드로 매핑하는 함수
-function getLanguageCodeFromVoice(voice) {
-  // 기본값은 영어
-  let langCode = 'en';
 
-  if (!voice) return langCode;
-
-  // 음성 이름에서 언어 코드 추출 시도
-  // 예: "Microsoft Heami - Korean (Korea)" => "ko"
-  // 예: "Google русский" => "ru"
-
-  const voiceLower = voice.toLowerCase();
-
-  // 언어 매핑 테이블
-  const languageMap = {
-    'ko': ['korean', 'korea', '한국어', 'ko-kr', 'ko-'],
-    'en': ['english', 'united states', 'united kingdom', 'en-us', 'en-gb', 'en-'],
-    'ja': ['japanese', 'japan', '日本語', 'ja-jp', 'ja-'],
-    'zh': ['chinese', 'china', '中文', 'zh-cn', 'zh-tw', 'zh-'],
-    'ru': ['russian', 'russia', 'русский', 'ru-ru', 'ru-']
-  };
-
-  // 음성 이름에서 언어 코드 찾기
-  for (const [code, keywords] of Object.entries(languageMap)) {
-    if (keywords.some(keyword => voiceLower.includes(keyword))) {
-      return code;
-    }
-  }
-
-  // 직접 언어 코드가 포함된 경우 (예: en-US)
-  if (voice.includes('(')) {
-    const match = voice.match(/\(([^)]+)\)/);
-    if (match && match[1]) {
-      const langPart = match[1].toLowerCase().trim();
-      // 처음 2자가 지원되는 언어 코드인지 확인
-      const twoLetterCode = langPart.slice(0, 2);
-      if (Object.keys(languageMap).includes(twoLetterCode)) {
-        return twoLetterCode;
-      }
-    }
-  }
-
-  // IETF 언어 태그 형식 (ko-KR, en-US 등) 확인
-  const langMatch = voice.match(/([a-z]{2})-[A-Z]{2}/);
-  if (langMatch && langMatch[1]) {
-    return langMatch[1];
-  }
-
-  return langCode; // 기본값 반환
-}
-
-// FFmpeg가 설치되어 있는지 확인하는 함수
-function isFFmpegInstalled() {
-  try {
-    execSync('ffmpeg -version', { stdio: 'ignore' });
-    return true;
-  } catch (error) {
-    console.log('FFmpeg가 설치되어 있지 않습니다. 속도와 피치 조절이 제한됩니다.');
-    return false;
-  }
-}
+// // FFmpeg가 설치되어 있는지 확인하는 함수
+// function isFFmpegInstalled() {
+//   try {
+//     execSync('ffmpeg -version', { stdio: 'ignore' });
+//     return true;
+//   } catch (error) {
+//     console.log('FFmpeg가 설치되어 있지 않습니다. 속도와 피치 조절이 제한됩니다.');
+//     return false;
+//   }
+// }
 
 export async function POST(request) {
   try {
@@ -89,6 +40,8 @@ export async function POST(request) {
     // 언어 코드 결정: 명시적 language 매개변수 우선, 없으면 음성에서 추출
     const langCode = language !== 'auto' && language ? language : getLanguageCodeFromVoice(voice);
     console.log(`Voice: ${voice}, Language: ${language}, Detected language: ${langCode}, Rate: ${rate}, Pitch: ${pitch}`);
+
+
 
     // 임시 파일 경로 생성
     const tempDir = os.tmpdir();
@@ -181,7 +134,8 @@ export async function POST(request) {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Disposition': `attachment; filename="${fileName}.mp3"`,
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache',
+        'X-FFmpeg-Installed': ffmpegInstalled ? 'true' : 'false'
       }
     });
   } catch (error) {
